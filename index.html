@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f1e8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="聊天记录" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>聊天记录保存器</title>
+  <style>
+    :root {
+      --bg: #f7f1e8;
+      --card: #fffaf2;
+      --card-2: #ffffff;
+      --text: #2c241d;
+      --muted: #7f6e5f;
+      --line: #e8d9c8;
+      --accent: #8f6a4f;
+      --accent-2: #6f4f3b;
+      --danger: #b25b4b;
+      --shadow: 0 10px 30px rgba(67, 45, 25, 0.10);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, var(--bg), #fff8ef 70%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 880px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+    }
+
+    header {
+      padding: 18px 2px 10px;
+    }
+
+    .top-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    .tiny {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .panel {
+      background: rgba(255, 250, 242, 0.9);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      backdrop-filter: blur(10px);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 6px 2px;
+    }
+
+    input, textarea, button {
+      font: inherit;
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--card-2);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 13px;
+      outline: none;
+      font-size: 16px;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #c1a083;
+      box-shadow: 0 0 0 3px rgba(143, 106, 79, 0.13);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .roles {
+      margin-top: 12px;
+    }
+
+    .role-chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    .role-chip.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .custom-role {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .custom-role input {
+      flex: 1;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 11px 14px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: #efe1d2;
+      color: var(--accent-2);
+    }
+
+    button.ghost {
+      background: transparent;
+      color: var(--accent-2);
+      border: 1px solid var(--line);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    main {
+      flex: 1;
+      padding: 12px 0;
+    }
+
+    .chat {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 16px;
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 42px 18px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.55);
+      line-height: 1.8;
+    }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      max-width: 82%;
+      gap: 4px;
+    }
+
+    .msg.me {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .msg.other {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .role-name {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 0 6px;
+    }
+
+    .bubble {
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.6;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 11px 13px;
+      box-shadow: 0 3px 12px rgba(67, 45, 25, 0.06);
+    }
+
+    .msg.me .bubble {
+      background: #8f6a4f;
+      color: #fff;
+      border-color: #8f6a4f;
+    }
+
+    footer {
+      position: sticky;
+      bottom: 0;
+      padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+      background: linear-gradient(180deg, rgba(255,248,239,0), rgba(255,248,239,0.98) 22%);
+    }
+
+    .composer {
+      background: rgba(255, 250, 242, 0.96);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px;
+    }
+
+    textarea {
+      resize: none;
+      min-height: 62px;
+      max-height: 180px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .left-actions, .right-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(92px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      background: rgba(44, 36, 29, 0.92);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 10;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    @media (max-width: 640px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .msg {
+        max-width: 92%;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      .top-title {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      button {
+        padding: 10px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="top-title">
+        <div>
+          <h1>聊天记录保存器</h1>
+          <div class="tiny">本工具只把内容保存在当前浏览器本地；导出前不会上传聊天内容。</div>
+        </div>
+        <button class="ghost" id="useNowBtn" type="button">使用当前时间</button>
+      </div>
+
+      <section class="panel">
+        <div class="grid">
+          <div>
+            <label for="titleInput">聊天标题</label>
+            <input id="titleInput" placeholder="例如：聊天" />
+          </div>
+          <div>
+            <label for="timeInput">聊天总时间，可手动改</label>
+            <input id="timeInput" placeholder="例如：2026-04-26 或 2026-04-26 21:30" />
+          </div>
+        </div>
+
+        <div class="roles">
+          <label>当前角色：<span id="currentRoleText">我</span></label>
+          <div class="row" id="roleList"></div>
+          <div class="custom-role">
+            <input id="customRoleInput" placeholder="自定义角色，比如：朋友、妈妈、老师" />
+            <button class="secondary" id="addRoleBtn" type="button">添加/切换</button>
+          </div>
+        </div>
+      </section>
+    </header>
+
+    <main>
+      <section class="chat" id="chatList"></section>
+    </main>
+
+    <footer>
+      <section class="composer">
+        <label for="messageInput">输入消息</label>
+        <textarea id="messageInput" placeholder="写完点发送，或在 Mac 上按 ⌘ + Enter 发送"></textarea>
+        <div class="actions">
+          <div class="left-actions">
+            <button class="secondary" id="undoBtn" type="button">撤回上一条</button>
+            <button class="danger" id="clearBtn" type="button">清空</button>
+          </div>
+          <div class="right-actions">
+            <button class="ghost" id="copyBtn" type="button">复制 Markdown</button>
+            <button id="exportBtn" type="button">导出 Markdown</button>
+            <button id="sendBtn" type="button">发送</button>
+          </div>
+        </div>
+      </section>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "chat_md_saver_v1";
+
+    const defaultState = {
+      title: "聊天",
+      chatTime: "",
+      currentRole: "我",
+      roles: ["我", "对方", "AI", "旁白"],
+      messages: []
+    };
+
+    let state = loadState();
+
+    const titleInput = document.getElementById("titleInput");
+    const timeInput = document.getElementById("timeInput");
+    const roleList = document.getElementById("roleList");
+    const currentRoleText = document.getElementById("currentRoleText");
+    const customRoleInput = document.getElementById("customRoleInput");
+    const addRoleBtn = document.getElementById("addRoleBtn");
+    const chatList = document.getElementById("chatList");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const exportBtn = document.getElementById("exportBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const undoBtn = document.getElementById("undoBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const useNowBtn = document.getElementById("useNowBtn");
+    const toast = document.getElementById("toast");
+
+    init();
+
+    function init() {
+      if (!state.chatTime) state.chatTime = formatDisplayDateTime(new Date());
+
+      titleInput.value = state.title;
+      timeInput.value = state.chatTime;
+      currentRoleText.textContent = state.currentRole;
+
+      renderRoles();
+      renderMessages();
+      bindEvents();
+      saveState();
+    }
+
+    function bindEvents() {
+      titleInput.addEventListener("input", () => {
+        state.title = titleInput.value.trim() || "聊天";
+        saveState();
+      });
+
+      timeInput.addEventListener("input", () => {
+        state.chatTime = timeInput.value.trim();
+        saveState();
+      });
+
+      useNowBtn.addEventListener("click", () => {
+        state.chatTime = formatDisplayDateTime(new Date());
+        timeInput.value = state.chatTime;
+        saveState();
+        showToast("已使用当前时间");
+      });
+
+      addRoleBtn.addEventListener("click", addCustomRole);
+
+      customRoleInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") addCustomRole();
+      });
+
+      sendBtn.addEventListener("click", sendMessage);
+
+      messageInput.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          sendMessage();
+        }
+      });
+
+      exportBtn.addEventListener("click", exportMarkdown);
+      copyBtn.addEventListener("click", copyMarkdown);
+
+      undoBtn.addEventListener("click", () => {
+        if (!state.messages.length) {
+          showToast("没有可以撤回的消息");
+          return;
+        }
+        state.messages.pop();
+        saveState();
+        renderMessages();
+        showToast("已撤回上一条");
+      });
+
+      clearBtn.addEventListener("click", () => {
+        if (!confirm("确定要清空当前聊天记录吗？这个操作不能恢复。")) return;
+        state.messages = [];
+        saveState();
+        renderMessages();
+        showToast("已清空");
+      });
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(defaultState);
+        const parsed = JSON.parse(raw);
+        return {
+          ...structuredClone(defaultState),
+          ...parsed,
+          roles: Array.isArray(parsed.roles) && parsed.roles.length ? parsed.roles : structuredClone(defaultState.roles),
+          messages: Array.isArray(parsed.messages) ? parsed.messages : []
+        };
+      } catch (error) {
+        return structuredClone(defaultState);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function renderRoles() {
+      roleList.innerHTML = "";
+
+      state.roles.forEach(role => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "role-chip" + (role === state.currentRole ? " active" : "");
+        btn.textContent = role;
+        btn.addEventListener("click", () => setRole(role));
+        roleList.appendChild(btn);
+      });
+    }
+
+    function setRole(role) {
+      state.currentRole = role;
+      currentRoleText.textContent = role;
+      saveState();
+      renderRoles();
+      showToast("已切换到：" + role);
+    }
+
+    function addCustomRole() {
+      const role = customRoleInput.value.trim();
+      if (!role) {
+        showToast("先输入角色名");
+        return;
+      }
+
+      if (!state.roles.includes(role)) {
+        state.roles.push(role);
+      }
+
+      customRoleInput.value = "";
+      setRole(role);
+      renderRoles();
+    }
+
+    function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text) {
+        showToast("先输入消息");
+        return;
+      }
+
+      state.messages.push({
+        role: state.currentRole,
+        text,
+        createdAt: new Date().toISOString()
+      });
+
+      messageInput.value = "";
+      saveState();
+      renderMessages();
+      requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }));
+    }
+
+    function renderMessages() {
+      chatList.innerHTML = "";
+
+      if (!state.messages.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.innerHTML = "还没有聊天记录。<br>选择角色，然后输入第一条消息。";
+        chatList.appendChild(empty);
+        return;
+      }
+
+      state.messages.forEach(msg => {
+        const wrap = document.createElement("article");
+        wrap.className = "msg " + (msg.role === "我" ? "me" : "other");
+
+        const role = document.createElement("div");
+        role.className = "role-name";
+        role.textContent = msg.role;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = msg.text;
+
+        wrap.appendChild(role);
+        wrap.appendChild(bubble);
+        chatList.appendChild(wrap);
+      });
+    }
+
+    function buildMarkdown() {
+      const title = (state.title || "聊天").trim();
+      const chatTime = (state.chatTime || formatDisplayDateTime(new Date())).trim();
+
+      let md = "";
+      md += "# " + title + "\n\n";
+      md += "时间：" + chatTime + "\n\n";
+      md += "---\n\n";
+      md += "## 聊天记录\n\n";
+
+      if (!state.messages.length) {
+        md += "暂无聊天记录。\n";
+        return md;
+      }
+
+      state.messages.forEach(msg => {
+        md += "**" + escapeMarkdownBold(msg.role) + "：**\n\n";
+        md += msg.text.trim() + "\n\n";
+      });
+
+      return md.trim() + "\n";
+    }
+
+    function exportMarkdown() {
+      const md = buildMarkdown();
+      const filename = buildFilename();
+
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+
+      showToast("已导出：" + filename);
+    }
+
+    async function copyMarkdown() {
+      const md = buildMarkdown();
+
+      try {
+        await navigator.clipboard.writeText(md);
+        showToast("已复制 Markdown");
+      } catch (error) {
+        const temp = document.createElement("textarea");
+        temp.value = md;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+        showToast("已复制 Markdown");
+      }
+    }
+
+    function buildFilename() {
+      const title = sanitizeFilename((state.title || "聊天").trim()) || "聊天";
+      const datePart = extractDateForFilename(state.chatTime) || formatDateForFilename(new Date());
+      return datePart + title + ".md";
+    }
+
+    function extractDateForFilename(input) {
+      if (!input) return "";
+
+      const text = String(input).trim();
+
+      let match = text.match(/(\d{4})[-/.年\s]*(\d{1,2})[-/.月\s]*(\d{1,2})/);
+      if (match) {
+        const y = match[1];
+        const m = String(match[2]).padStart(2, "0");
+        const d = String(match[3]).padStart(2, "0");
+        return y + m + d;
+      }
+
+      match = text.match(/(\d{8})/);
+      if (match) return match[1];
+
+      return "";
+    }
+
+    function sanitizeFilename(name) {
+      return name
+        .replace(/[\\/:*?"<>|#%&{}$!'@+=`]/g, "")
+        .replace(/\s+/g, "")
+        .slice(0, 60);
+    }
+
+    function escapeMarkdownBold(text) {
+      return String(text).replace(/\*/g, "\\*");
+    }
+
+    function formatDisplayDateTime(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      return `${y}-${m}-${d} ${hh}:${mm}`;
+    }
+
+    function formatDateForFilename(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}${m}${d}`;
+    }
+
+    let toastTimer = null;
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, 1800);
+    }
+  </script>
+</body>
+</html>
