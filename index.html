@@ -619,7 +619,6 @@
     }
 
 
-
     /* 对话札记顶部：只替换原顶部，不影响底部输入区 */
     .topbar {
       height: calc(62px + env(safe-area-inset-top));
@@ -824,6 +823,7 @@
       <textarea class="message-input" id="messageInput" placeholder="说点什么……"></textarea>
       <div class="action-row">
         <button class="icon-btn" id="undoBtn" type="button" aria-label="撤回上一条" title="撤回上一条"></button>
+        <button class="icon-btn" id="redoBtn" type="button" aria-label="恢复撤回" title="恢复撤回"></button>
         <button class="icon-btn" id="roleManageBtn" type="button" aria-label="角色管理" title="角色管理"></button>
         <button class="icon-btn danger-soft" id="clearBtn" type="button" aria-label="清空聊天" title="清空聊天"></button>
         <span class="spacer"></span>
@@ -834,8 +834,6 @@
   </footer>
 
   <div class="sheet-backdrop" id="sheetBackdrop"></div>
-
-
 
   <section class="sheet" id="titleSheet" aria-hidden="true">
     <div class="sheet-card">
@@ -926,10 +924,11 @@
 
     const icons = {
       undo: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8H4V3"/><path d="M4.8 8.1A8 8 0 1 1 7 19.2"/></svg>`,
+      redo: `<svg viewBox="0 0 24 24" aria-hidden="true" style="transform: scaleX(-1);"><path d="M9 8H4V3"/><path d="M4.8 8.1A8 8 0 1 1 7 19.2"/></svg>`,
       users: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 19c0-2.2-1.8-4-4-4H8c-2.2 0-4 1.8-4 4"/><circle cx="10" cy="8" r="3"/><path d="M20 19c0-1.8-1.1-3.3-2.7-3.8"/><path d="M16.5 5.3a3 3 0 0 1 0 5.4"/></svg>`,
       trash: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>`,
       send: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14"/><path d="M21 3 14 21l-4-7-7-4 18-7Z"/></svg>`,
-      swap: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12"/><path d="m16 4 3 3-3 3"/><path d="M17 17H5"/><path d="m8 14-3 3 3 3"/></svg>`,
+      paste: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6"/><path d="M9 4.5A2.5 2.5 0 0 1 11.5 2h1A2.5 2.5 0 0 1 15 4.5V6H9V4.5z"/><path d="M7 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1"/><path d="M8 11h8"/><path d="M8 15h6"/></svg>`,
       close: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>`,
       download: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 20h14"/></svg>`
     };
@@ -947,34 +946,36 @@
 
     let state = loadState();
     let toastTimer = null;
+    let redoStack = [];
 
     const displayTitle = document.getElementById("displayTitle");
-    const editTitleBtn = document.getElementById("editTitleBtn");
     const aboutBtn = document.getElementById("aboutBtn");
+    const editTitleBtn = document.getElementById("editTitleBtn");
+    const titleSheet = document.getElementById("titleSheet");
+    const aboutSheet = document.getElementById("aboutSheet");
     const chatTitleInput = document.getElementById("chatTitleInput");
     const saveTitleBtn = document.getElementById("saveTitleBtn");
-    const closeTitleSheetBtn = document.getElementById("closeTitleSheetBtn");
-    const closeAboutSheetBtn = document.getElementById("closeAboutSheetBtn");
-    const exportDateInput = document.getElementById("exportDateInput");
-    const filenameInput = document.getElementById("filenameInput");
     const chatList = document.getElementById("chatList");
     const roleBar = document.getElementById("roleBar");
     const messageInput = document.getElementById("messageInput");
     const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
     const roleManageBtn = document.getElementById("roleManageBtn");
     const clearBtn = document.getElementById("clearBtn");
     const exportMenuBtn = document.getElementById("exportMenuBtn");
     const sendBtn = document.getElementById("sendBtn");
     const sheetBackdrop = document.getElementById("sheetBackdrop");
-    const titleSheet = document.getElementById("titleSheet");
-    const aboutSheet = document.getElementById("aboutSheet");
     const roleSheet = document.getElementById("roleSheet");
     const exportSheet = document.getElementById("exportSheet");
+    const closeTitleSheetBtn = document.getElementById("closeTitleSheetBtn");
+    const closeAboutSheetBtn = document.getElementById("closeAboutSheetBtn");
     const closeRoleSheetBtn = document.getElementById("closeRoleSheetBtn");
     const closeExportSheetBtn = document.getElementById("closeExportSheetBtn");
     const newRoleInput = document.getElementById("newRoleInput");
     const addRoleBtn = document.getElementById("addRoleBtn");
     const roleManageList = document.getElementById("roleManageList");
+    const exportDateInput = document.getElementById("exportDateInput");
+    const filenameInput = document.getElementById("filenameInput");
     const copyBtn = document.getElementById("copyBtn");
     const downloadBtn = document.getElementById("downloadBtn");
     const dialogBackdrop = document.getElementById("dialogBackdrop");
@@ -987,16 +988,18 @@
 
     function init() {
       undoBtn.innerHTML = icons.undo;
+      redoBtn.innerHTML = icons.redo;
       roleManageBtn.innerHTML = icons.users;
       clearBtn.innerHTML = icons.trash;
       sendBtn.innerHTML = icons.send;
-      closeRoleSheetBtn.innerHTML = icons.close;
-      closeExportSheetBtn.innerHTML = icons.close;
       closeTitleSheetBtn.innerHTML = icons.close;
       closeAboutSheetBtn.innerHTML = icons.close;
+      closeRoleSheetBtn.innerHTML = icons.close;
+      closeExportSheetBtn.innerHTML = icons.close;
 
       normalizeState();
       if (!state.exportDate) state.exportDate = formatDateInput(new Date());
+      renderHeader();
 
       bindEvents();
       renderAll();
@@ -1004,16 +1007,14 @@
     }
 
     function bindEvents() {
-      editTitleBtn.addEventListener("click", openTitleSheet);
       aboutBtn.addEventListener("click", openAboutSheet);
+      editTitleBtn.addEventListener("click", openTitleSheet);
       closeTitleSheetBtn.addEventListener("click", closeSheets);
       closeAboutSheetBtn.addEventListener("click", closeSheets);
       saveTitleBtn.addEventListener("click", saveTitleFromSheet);
       chatTitleInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") saveTitleFromSheet();
       });
-      exportDateInput.addEventListener("input", updateFilenameDefault);
-      filenameInput.addEventListener("focus", () => filenameInput.dataset.touched = "1");
 
       sendBtn.addEventListener("click", sendMessage);
 
@@ -1030,6 +1031,7 @@
       });
 
       undoBtn.addEventListener("click", undoLastMessage);
+      redoBtn.addEventListener("click", redoMessage);
       roleManageBtn.addEventListener("click", openRoleSheet);
       clearBtn.addEventListener("click", openClearDialog);
       exportMenuBtn.addEventListener("click", openExportSheet);
@@ -1043,6 +1045,11 @@
         if (event.key === "Enter") addRoleFromInput();
       });
 
+      exportDateInput.addEventListener("input", () => {
+        state.exportDate = exportDateInput.value;
+        filenameInput.value = buildDefaultFilename();
+        saveState();
+      });
       copyBtn.addEventListener("click", copyMarkdown);
       downloadBtn.addEventListener("click", exportMarkdown);
 
@@ -1053,7 +1060,7 @@
 
     function loadState() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY) || localStorage.getItem("dialogue_note_v3") || localStorage.getItem("dialogue_note_v2");
+        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY);
         if (!raw) return structuredClone(defaultState);
         const parsed = JSON.parse(raw);
         return {
@@ -1082,6 +1089,8 @@
       if (typeof state.autoSwitchEnabled !== "boolean") {
         state.autoSwitchEnabled = true;
       }
+      if (typeof state.title !== "string") state.title = "";
+      if (!state.exportDate) state.exportDate = formatDateInput(new Date());
     }
 
     function uniqueClean(list) {
@@ -1109,6 +1118,10 @@
       const title = getDisplayTitle();
       displayTitle.textContent = title;
       document.title = title === "聊天" ? "对话札记" : title + "｜对话札记";
+    }
+
+    function getDisplayTitle() {
+      return (state.title || "").trim() || "聊天";
     }
 
     function renderRoleBar() {
@@ -1149,19 +1162,19 @@
           showToast(state.autoSwitchEnabled ? "自动切换已开启" : "自动切换已关闭");
         });
 
-        const swap = document.createElement("button");
-        swap.type = "button";
-        swap.className = "icon-btn";
-        swap.title = "交换发言顺序";
-        swap.setAttribute("aria-label", "交换发言顺序");
-        swap.innerHTML = icons.swap;
-        swap.addEventListener("click", swapRoleOrder);
+        const paste = document.createElement("button");
+        paste.type = "button";
+        paste.className = "icon-btn";
+        paste.title = "粘贴";
+        paste.setAttribute("aria-label", "粘贴");
+        paste.innerHTML = icons.paste;
+        paste.addEventListener("click", pasteFromClipboard);
 
         flow.appendChild(current);
         flow.appendChild(flowPill);
         flow.appendChild(auto);
         roleBar.appendChild(flow);
-        roleBar.appendChild(swap);
+        roleBar.appendChild(paste);
         return;
       }
 
@@ -1346,6 +1359,8 @@
         return;
       }
 
+      redoStack = [];
+
       state.messages.push({
         role: state.currentRole,
         text,
@@ -1370,6 +1385,7 @@
       }
 
       const removed = state.messages.pop();
+      if (removed) redoStack.push(removed);
       if (removed && removed.role && state.roles.includes(removed.role)) {
         state.currentRole = removed.role;
       }
@@ -1379,7 +1395,21 @@
       showToast("已撤回上一条");
     }
 
+    function redoMessage() {
+      if (!redoStack.length) {
+        showToast("没有可恢复的消息");
+        return;
+      }
+
+      const restored = redoStack.pop();
+      state.messages.push(restored);
+      saveState();
+      renderAll();
+      requestAnimationFrame(scrollToBottom);
+    }
+
     function clearMessages() {
+      redoStack = [];
       state.messages = [];
       saveState();
       renderMessages();
@@ -1387,18 +1417,9 @@
       showToast("已清空聊天记录");
     }
 
-    function openRoleSheet() {
-      closeSheets(false);
-      renderRoleManageList();
-      sheetBackdrop.classList.add("show");
-      roleSheet.classList.add("show");
-      roleSheet.setAttribute("aria-hidden", "false");
-      setTimeout(() => newRoleInput.focus(), 120);
-    }
-
     function openTitleSheet() {
       closeSheets(false);
-      chatTitleInput.value = state.title === "聊天" ? "" : (state.title || "");
+      chatTitleInput.value = (state.title || "").trim();
       sheetBackdrop.classList.add("show");
       titleSheet.classList.add("show");
       titleSheet.setAttribute("aria-hidden", "false");
@@ -1420,25 +1441,34 @@
       aboutSheet.setAttribute("aria-hidden", "false");
     }
 
+    function openRoleSheet() {
+      closeSheets(false);
+      renderRoleManageList();
+      sheetBackdrop.classList.add("show");
+      roleSheet.classList.add("show");
+      roleSheet.setAttribute("aria-hidden", "false");
+      setTimeout(() => newRoleInput.focus(), 120);
+    }
+
     function openExportSheet() {
       closeSheets(false);
-      exportDateInput.value = state.exportDate || formatDateInput(new Date());
-      filenameInput.dataset.touched = "";
-      filenameInput.value = buildDefaultFilename(exportDateInput.value);
+      if (!state.exportDate) state.exportDate = formatDateInput(new Date());
+      exportDateInput.value = state.exportDate;
+      filenameInput.value = buildDefaultFilename();
       sheetBackdrop.classList.add("show");
       exportSheet.classList.add("show");
       exportSheet.setAttribute("aria-hidden", "false");
     }
 
     function closeSheets(hideBackdrop = true) {
-      roleSheet.classList.remove("show");
-      exportSheet.classList.remove("show");
       titleSheet.classList.remove("show");
       aboutSheet.classList.remove("show");
-      roleSheet.setAttribute("aria-hidden", "true");
-      exportSheet.setAttribute("aria-hidden", "true");
+      roleSheet.classList.remove("show");
+      exportSheet.classList.remove("show");
       titleSheet.setAttribute("aria-hidden", "true");
       aboutSheet.setAttribute("aria-hidden", "true");
+      roleSheet.setAttribute("aria-hidden", "true");
+      exportSheet.setAttribute("aria-hidden", "true");
       if (hideBackdrop) sheetBackdrop.classList.remove("show");
     }
 
@@ -1456,11 +1486,11 @@
 
     function buildMarkdown() {
       const title = getDisplayTitle();
-      const dateText = exportDateInput.value || state.exportDate || formatDateInput(new Date());
+      const dateText = getExportDateText();
 
       let md = "";
       md += "# " + title + "\n\n";
-      md += "时间：" + dateText + "\n\n";
+      md += "日期：" + dateText + "\n\n";
       md += "---\n\n";
       md += "## 聊天记录\n\n";
 
@@ -1478,7 +1508,7 @@
     }
 
     async function copyMarkdown() {
-      updateFilenameDefault();
+      if (exportDateInput && exportDateInput.value) state.exportDate = exportDateInput.value;
       const md = buildMarkdown();
       try {
         await navigator.clipboard.writeText(md);
@@ -1495,9 +1525,9 @@
     }
 
     function exportMarkdown() {
-      updateFilenameDefault();
+      if (exportDateInput && exportDateInput.value) state.exportDate = exportDateInput.value;
       const md = buildMarkdown();
-      const filename = normalizeFilename(filenameInput.value || buildDefaultFilename(exportDateInput.value));
+      const filename = buildFilename();
       const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -1513,26 +1543,39 @@
       showToast("已导出：" + filename);
     }
 
-    function updateFilenameDefault() {
-      state.exportDate = exportDateInput.value || formatDateInput(new Date());
-      saveState();
-      if (!filenameInput.dataset.touched) filenameInput.value = buildDefaultFilename(state.exportDate);
+    function buildFilename() {
+      const custom = filenameInput ? filenameInput.value.trim() : "";
+      if (custom) return custom.endsWith(".md") ? custom : custom + ".md";
+      return buildDefaultFilename();
     }
 
-    function buildDefaultFilename(dateInput) {
-      const datePart = dateInput ? dateInput.replace(/-/g, "") : formatDateForFilename(new Date());
-      return datePart + sanitizeFilename(getDisplayTitle()) + ".md";
+    function buildDefaultFilename() {
+      const title = sanitizeFilename(getDisplayTitle()) || "聊天";
+      const datePart = formatDateCompact(parseDateInputValue(state.exportDate) || new Date());
+      return datePart + title + ".md";
     }
 
-    function normalizeFilename(value) {
-      let name = sanitizeFilename(String(value || "").trim());
-      if (!name) name = buildDefaultFilename(exportDateInput.value);
-      if (!/\.md$/i.test(name)) name += ".md";
-      return name;
+    function getExportDateText() {
+      if (exportDateInput && exportDateInput.value) {
+        state.exportDate = exportDateInput.value;
+        saveState();
+      }
+      return state.exportDate || formatDateInput(new Date());
     }
 
-    function getDisplayTitle() {
-      return (state.title || "").trim() || "聊天";
+    function extractDateForFilename(input) {
+      if (!input) return "";
+      const text = String(input).trim();
+      let match = text.match(/(\d{4})[-/.年\s]*(\d{1,2})[-/.月\s]*(\d{1,2})/);
+      if (match) {
+        const y = match[1];
+        const m = String(match[2]).padStart(2, "0");
+        const d = String(match[3]).padStart(2, "0");
+        return y + m + d;
+      }
+      match = text.match(/(\d{8})/);
+      if (match) return match[1];
+      return "";
     }
 
     function sanitizeFilename(name) {
@@ -1560,6 +1603,33 @@
       const m = String(date.getMonth() + 1).padStart(2, "0");
       const d = String(date.getDate()).padStart(2, "0");
       return `${y}-${m}-${d}`;
+    }
+
+    function parseDateInputValue(value) {
+      if (!value) return null;
+      const parts = String(value).split("-").map(Number);
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function formatDateCompact(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}${m}${d}`;
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error("clipboard unavailable");
+        const text = await navigator.clipboard.readText();
+        messageInput.value = text;
+        messageInput.style.height = "auto";
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 130) + "px";
+        messageInput.focus();
+      } catch (error) {
+        showToast("粘贴失败，请长按输入框粘贴");
+      }
     }
 
     function formatDisplayDateTime(date) {
