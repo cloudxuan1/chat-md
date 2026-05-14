@@ -1188,7 +1188,16 @@
         btn.addEventListener("click", () => setRole(role));
         scroll.appendChild(btn);
       });
+      const paste = document.createElement("button");
+      paste.type = "button";
+      paste.className = "icon-btn";
+      paste.title = "粘贴";
+      paste.setAttribute("aria-label", "粘贴");
+      paste.innerHTML = icons.paste;
+      paste.addEventListener("click", pasteFromClipboard);
+
       roleBar.appendChild(scroll);
+      roleBar.appendChild(paste);
     }
 
     function renderMessages() {
@@ -1626,7 +1635,8 @@
         messageInput.value = text;
         messageInput.style.height = "auto";
         messageInput.style.height = Math.min(messageInput.scrollHeight, 130) + "px";
-        messageInput.focus();
+        messageInput.blur();
+        setTimeout(() => messageInput.blur(), 50);
       } catch (error) {
         showToast("粘贴失败，请长按输入框粘贴");
       }
